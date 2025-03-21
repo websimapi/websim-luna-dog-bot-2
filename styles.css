@@ -1,0 +1,270 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Arial Rounded MT Bold', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f0f8ff;
+    color: #444;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+h1 {
+    color: #8b4513;
+    font-size: 2.5rem;
+    margin-bottom: 5px;
+}
+
+.subtitle {
+    color: #666;
+    font-size: 1.2rem;
+}
+
+/* Dog design */
+.dog-container {
+    display: flex;
+    justify-content: center;
+    margin: 30px 0;
+    position: relative;
+}
+
+.dog {
+    position: relative;
+}
+
+.dog-head {
+    width: 200px;
+    height: 200px;
+    background-color: #d2b48c;
+    border-radius: 50%;
+    position: relative;
+}
+
+.dog-ears {
+    width: 80px;
+    height: 100px;
+    background-color: #a0522d;
+    border-radius: 50% 50% 0 0;
+    position: absolute;
+    top: -40px;
+}
+
+.ear-left {
+    left: 0;
+    transform: rotate(-15deg);
+}
+
+.ear-right {
+    right: 0;
+    transform: rotate(15deg);
+}
+
+.dog-face {
+    position: relative;
+    top: 50px;
+}
+
+.dog-eyes {
+    width: 20px;
+    height: 25px;
+    background-color: #222;
+    border-radius: 50%;
+    position: absolute;
+    top: 20px;
+}
+
+.eye-left {
+    left: 55px;
+}
+
+.eye-right {
+    right: 55px;
+}
+
+.dog-nose {
+    width: 30px;
+    height: 20px;
+    background-color: #222;
+    border-radius: 50%;
+    position: absolute;
+    top: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.dog-mouth {
+    width: 70px;
+    height: 25px;
+    border-radius: 0 0 50% 50%;
+    border-bottom: 4px solid #222;
+    position: absolute;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    transition: all 0.3s ease;
+}
+
+.dog-mouth.bark {
+    height: 40px;
+    animation: bark 0.5s ease-in-out;
+}
+
+@keyframes bark {
+    0%, 100% { height: 25px; }
+    50% { height: 40px; }
+}
+
+.dog-tail {
+    width: 20px;
+    height: 80px;
+    background-color: #a0522d;
+    border-radius: 10px;
+    position: absolute;
+    right: -60px;
+    top: 80px;
+    transform-origin: top center;
+    transform: rotate(45deg);
+    transition: all 0.2s ease;
+}
+
+.dog-tail.wag {
+    animation: wag 0.5s infinite alternate;
+}
+
+@keyframes wag {
+    0% { transform: rotate(25deg); }
+    100% { transform: rotate(65deg); }
+}
+
+/* Chat section */
+.chat-section {
+    background-color: white;
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+}
+
+.twitch-info {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.twitch-info label {
+    margin-right: 10px;
+    font-weight: bold;
+}
+
+.twitch-info input {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    flex: 1;
+    min-width: 150px;
+}
+
+#connect-btn {
+    padding: 8px 15px;
+    background-color: #9146ff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+#status-indicator {
+    padding: 5px 10px;
+    background-color: #f44336;
+    color: white;
+    border-radius: 5px;
+    font-size: 0.9rem;
+}
+
+#status-indicator.connected {
+    background-color: #4caf50;
+}
+
+.chat-container {
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.chat-messages {
+    height: 300px;
+    overflow-y: auto;
+    padding: 15px;
+    background-color: #f9f9f9;
+}
+
+.message {
+    margin-bottom: 15px;
+    padding: 10px;
+    border-radius: 10px;
+    max-width: 80%;
+}
+
+.user-message {
+    background-color: #e9f5ff;
+    margin-left: auto;
+    border-top-right-radius: 0;
+}
+
+.luna-message {
+    background-color: #f0f0f0;
+    margin-right: auto;
+    border-top-left-radius: 0;
+}
+
+.message .sender {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.interaction {
+    display: flex;
+    padding: 10px;
+}
+
+.interaction input {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    margin-right: 10px;
+}
+
+#send-btn {
+    padding: 10px 15px;
+    background-color: #8b4513;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+@media (max-width: 600px) {
+    .twitch-info {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .twitch-info label, #status-indicator {
+        margin: 5px 0;
+    }
+}
+
