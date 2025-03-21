@@ -57,7 +57,7 @@ async function getLLMResponse(message) {
             messages: [
                 {
                     role: "system",
-                    content: "You are Luna, a friendly dog. Respond ONLY like a dog would with barks, whines, and physical actions in asterisks. Always format your response with bark sounds (woof, bark, arf, ruff, awoo) separated from actions. For example: 'Woof! Woof! *wags tail excitedly*' or '*tilts head curiously* Arf arf!' Keep responses under 2 sentences. Never use human language or explain things. Always include at least one bark sound (woof, bark, arf, ruff, awoo)."
+                    content: "You are Luna, a friendly dog. Respond ONLY like a dog would with barks, whines, and physical actions in asterisks. Always follow this exact format: Start with a bark word (woof, bark, arf, ruff, awoo), then include actions in asterisks, then optionally end with more barks. For example: 'Woof! *wags tail excitedly*' or 'Arf! *tilts head curiously* Woof woof!' Keep responses under 2 sentences. Never use human language or explain things. Always include at least one bark sound and one action in asterisks. Make your response very easy to parse by clearly separating barks from actions in asterisks."
                 },
                 ...conversationHistory
             ]
@@ -109,6 +109,8 @@ function processLunaResponse(message) {
     // Don't try to play sounds if user hasn't interacted yet
     if (!userHasInteracted) return;
     
+    console.log("Processing Luna response:", message);
+    
     // Extract parts of the message: bark sounds and actions
     const parts = [];
     let remainingMessage = message;
@@ -146,6 +148,8 @@ function processLunaResponse(message) {
         countAndPlayBarks(message);
         return;
     }
+    
+    console.log("Parsed Luna parts:", parts);
     
     // Process the parts in sequence
     processLunaParts(parts, 0);
@@ -194,21 +198,33 @@ function countBarksInText(text) {
 }
 
 function playBarkSequence(count, callback) {
+    console.log(`Playing bark sequence: ${count} barks`);
     let played = 0;
     
     function playNext() {
-        barkSound.currentTime = 0;
-        barkSound.play().catch(err => {
-            console.log("Audio play error:", err);
+        if (!userHasInteracted) {
+            console.warn("User hasn't interacted yet, can't play audio");
             if (callback) callback();
-        });
+            return;
+        }
         
-        played++;
-        
-        if (played < count) {
-            barkSound.onended = playNext;
-        } else {
-            barkSound.onended = callback;
+        try {
+            barkSound.currentTime = 0;
+            barkSound.play().catch(err => {
+                console.error("Audio play error:", err);
+                if (callback) callback();
+            });
+            
+            played++;
+            
+            if (played < count) {
+                barkSound.onended = playNext;
+            } else {
+                barkSound.onended = callback;
+            }
+        } catch (error) {
+            console.error("Error playing bark:", error);
+            if (callback) callback();
         }
     }
     
@@ -216,21 +232,35 @@ function playBarkSequence(count, callback) {
 }
 
 function speakTextWithCallback(text, callback) {
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.0;
-    utterance.pitch = 1.1;
-    utterance.volume = 0.9;
+    console.log("Speaking with TTS:", text);
     
-    utterance.onend = function() {
+    if (!window.speechSynthesis) {
+        console.error("Speech synthesis not available");
         if (callback) callback();
-    };
+        return;
+    }
     
-    utterance.onerror = function(event) {
-        console.error("TTS error:", event);
+    try {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 1.0;
+        utterance.pitch = 1.1;
+        utterance.volume = 0.9;
+        
+        utterance.onend = function() {
+            console.log("TTS ended successfully");
+            if (callback) callback();
+        };
+        
+        utterance.onerror = function(event) {
+            console.error("TTS error:", event);
+            if (callback) callback();
+        };
+        
+        window.speechSynthesis.speak(utterance);
+    } catch (error) {
+        console.error("Error initializing speech:", error);
         if (callback) callback();
-    };
-    
-    window.speechSynthesis.speak(utterance);
+    }
 }
 
 function countAndPlayBarks(message) {
@@ -455,11 +485,16 @@ document.addEventListener('DOMContentLoaded', function() {
     if ('speechSynthesis' in window) {
         // Create and immediately cancel a blank utterance
         // This helps initialize the speech engine on some browsers
-        const warmupUtterance = new SpeechSynthesisUtterance('');
-        window.speechSynthesis.speak(warmupUtterance);
-        window.speechSynthesis.cancel();
-        
-        console.log("Speech synthesis initialized");
+        setTimeout(() => {
+            try {
+                const warmupUtterance = new SpeechSynthesisUtterance('');
+                window.speechSynthesis.speak(warmupUtterance);
+                window.speechSynthesis.cancel();
+                console.log("Speech synthesis initialized");
+            } catch (e) {
+                console.error("Error initializing speech synthesis:", e);
+            }
+        }, 1000);
     } else {
         console.error("Speech synthesis not supported in this browser");
     }
