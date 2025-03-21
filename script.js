@@ -172,6 +172,7 @@ function processLunaParts(parts, index) {
     } else if (part.type === 'action') {
         // Speak the action with TTS
         const ttsText = `Luna, ${part.text}`;
+        console.log("Speaking with TTS:", ttsText);
         speakTextWithCallback(ttsText, () => {
             // When TTS is done, move to next part
             setTimeout(() => processLunaParts(parts, index + 1), 300);
@@ -216,17 +217,20 @@ function playBarkSequence(count, callback) {
 
 function speakTextWithCallback(text, callback) {
     const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.1;
+    utterance.volume = 0.9;
     
     utterance.onend = function() {
         if (callback) callback();
     };
     
-    utterance.onerror = function() {
-        console.error("TTS error");
+    utterance.onerror = function(event) {
+        console.error("TTS error:", event);
         if (callback) callback();
     };
     
-    speechSynthesis.speak(utterance);
+    window.speechSynthesis.speak(utterance);
 }
 
 function countAndPlayBarks(message) {
@@ -248,7 +252,14 @@ function countAndPlayBarks(message) {
 }
 
 function speakText(text) {
-    speakTextWithCallback(text);
+    if (!text) return;
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.1;
+    utterance.volume = 0.9;
+    
+    window.speechSynthesis.speak(utterance);
 }
 
 // Event listeners
@@ -436,3 +447,20 @@ function disconnectFromTwitch() {
 setTimeout(() => {
     addMessageToChat('Luna', 'Woof woof! I\'m Luna! Talk to me or connect me to a Twitch chat!', true);
 }, 1000);
+
+// Add speech synthesis initialization code
+// Initialize speech synthesis when document is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Pre-warm speech synthesis engine
+    if ('speechSynthesis' in window) {
+        // Create and immediately cancel a blank utterance
+        // This helps initialize the speech engine on some browsers
+        const warmupUtterance = new SpeechSynthesisUtterance('');
+        window.speechSynthesis.speak(warmupUtterance);
+        window.speechSynthesis.cancel();
+        
+        console.log("Speech synthesis initialized");
+    } else {
+        console.error("Speech synthesis not supported in this browser");
+    }
+});
