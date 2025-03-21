@@ -76,7 +76,23 @@ function addMessageToChat(sender, message, isLuna = false) {
     
     if (isLuna) {
         bark();
+        
+        // Check for actions in asterisks and use TTS
+        if (message.includes('*')) {
+            const matches = message.match(/\*(.*?)\*/g);
+            if (matches && matches.length > 0) {
+                const actions = matches.map(match => match.replace(/\*/g, '').trim());
+                const ttsText = `Luna, ${actions.join(', ')}`;
+                speakText(ttsText);
+            }
+        }
     }
+}
+
+// Function to speak text using TTS
+function speakText(text) {
+    const utterance = new SpeechSynthesisUtterance(text);
+    speechSynthesis.speak(utterance);
 }
 
 // Event listeners
