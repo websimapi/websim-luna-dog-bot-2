@@ -13,6 +13,7 @@ const statusIndicator = document.getElementById('status-indicator');
 // Luna's state
 let isConnected = false;
 let twitchConnection = null;
+let twitchSocket = null;
 
 // Luna's behaviors
 function bark() {
@@ -104,10 +105,10 @@ function handleSendMessage() {
 }
 
 function toggleTwitchConnection() {
-    const channel = channelInput.value.trim();
+    const channel = channelInput.value.trim().toLowerCase();
     
     if (!isConnected && channel) {
-        // Connect to Twitch (simulated for demonstration)
+        // Connect to Twitch chat
         connectToTwitch(channel);
     } else if (isConnected) {
         // Disconnect from Twitch
@@ -118,16 +119,65 @@ function toggleTwitchConnection() {
 }
 
 function connectToTwitch(channel) {
-    // Simulate connection to Twitch
-    isConnected = true;
-    statusIndicator.textContent = `Connected to ${channel}`;
-    statusIndicator.classList.add('connected');
-    connectBtn.textContent = 'Disconnect';
+    // Create WebSocket connection to Twitch IRC
+    twitchSocket = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
     
-    addMessageToChat('System', `Luna is now connected to ${channel}'s Twitch chat!`);
+    twitchSocket.onopen = function() {
+        // Anonymous connection to Twitch chat
+        twitchSocket.send('PASS SCHMOOPIIE');
+        twitchSocket.send('NICK justinfan' + Math.floor(Math.random() * 999999));
+        twitchSocket.send('CAP REQ :twitch.tv/commands twitch.tv/tags');
+        twitchSocket.send(`JOIN #${channel}`);
+        
+        isConnected = true;
+        statusIndicator.textContent = `Connected to ${channel}`;
+        statusIndicator.classList.add('connected');
+        connectBtn.textContent = 'Disconnect';
+        
+        addMessageToChat('System', `Luna is now connected to ${channel}'s Twitch chat!`);
+    };
     
-    // Simulate receiving messages from Twitch chat
-    startTwitchSimulation(channel);
+    twitchSocket.onmessage = function(event) {
+        const message = event.data;
+        
+        // Keep connection alive
+        if (message.includes('PING')) {
+            twitchSocket.send('PONG :tmi.twitch.tv');
+            return;
+        }
+        
+        // Parse chat messages
+        if (message.includes('PRIVMSG')) {
+            try {
+                // Extract username and message content
+                const username = message.split('!')[0].slice(1);
+                const chatMessage = message.split('PRIVMSG #' + channel + ' :')[1];
+                
+                // Add message to chat
+                addMessageToChat(username, chatMessage);
+                
+                // Luna responds
+                setTimeout(() => {
+                    const lunaResponse = generateLunaResponse(chatMessage);
+                    addMessageToChat('Luna', lunaResponse, true);
+                }, 1500);
+            } catch (e) {
+                console.error('Error parsing Twitch message:', e);
+            }
+        }
+    };
+    
+    twitchSocket.onerror = function(error) {
+        console.error('WebSocket Error:', error);
+        addMessageToChat('System', 'Error connecting to Twitch chat. Please try again.');
+        disconnectFromTwitch();
+    };
+    
+    twitchSocket.onclose = function() {
+        if (isConnected) {
+            disconnectFromTwitch();
+        }
+    };
 }
 
 function disconnectFromTwitch() {
@@ -138,47 +188,20 @@ function disconnectFromTwitch() {
     
     addMessageToChat('System', 'Luna has been disconnected from Twitch chat.');
     
-    // Clear the simulation
+    // Close WebSocket connection
+    if (twitchSocket) {
+        twitchSocket.close();
+        twitchSocket = null;
+    }
+    
+    // Clear any intervals
     if (twitchConnection) {
         clearInterval(twitchConnection);
         twitchConnection = null;
     }
 }
 
-function startTwitchSimulation(channel) {
-    // Create fake Twitch users and messages
-    const twitchUsers = [
-        'StreamFan123', 'GamerGirl42', 'TwitchViewer', 'ChatLurker', 
-        'StreamSupporter', 'GameEnthusiast', 'StreamNewbie', 'LongTimeViewer'
-    ];
-    
-    const twitchMessages = [
-        'Hello Luna!', 'Good doggo!', 'Can Luna do tricks?', 
-        'Who\'s a good girl?', 'Luna is so cute!', 'Woof woof!',
-        'Does Luna want a treat?', 'Luna come play with me!',
-        'No barking Luna!', 'I love dogs so much!',
-        'Luna what do you think of cats?', 'Is Luna sleepy?'
-    ];
-    
-    twitchConnection = setInterval(() => {
-        // Random chance to simulate a new message
-        if (Math.random() > 0.7) {
-            const randomUser = twitchUsers[Math.floor(Math.random() * twitchUsers.length)];
-            const randomMessage = twitchMessages[Math.floor(Math.random() * twitchMessages.length)];
-            
-            addMessageToChat(randomUser, randomMessage);
-            
-            // Luna responds
-            setTimeout(() => {
-                const lunaResponse = generateLunaResponse(randomMessage);
-                addMessageToChat('Luna', lunaResponse, true);
-            }, 1500);
-        }
-    }, 5000); // Check every 5 seconds
-}
-
 // Initial greeting
 setTimeout(() => {
     addMessageToChat('Luna', 'Woof woof! I\'m Luna! Talk to me or connect me to a Twitch chat!', true);
 }, 1000);
-
