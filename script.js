@@ -19,6 +19,7 @@ let isConnected = false;
 let twitchConnection = null;
 let twitchSocket = null;
 let conversationHistory = [];
+let userHasInteracted = false;
 
 // Luna's behaviors
 function bark() {
@@ -32,6 +33,11 @@ function bark() {
     setTimeout(() => {
         dogTail.classList.remove('wag');
     }, 1000);
+    
+    // Only play sound if user has interacted with the page
+    if (userHasInteracted) {
+        playBarkSounds("woof");
+    }
 }
 
 async function generateLunaResponse(message) {
@@ -115,6 +121,9 @@ function addMessageToChat(sender, message, isLuna = false) {
 }
 
 function playBarkSounds(message) {
+    // Don't try to play sounds if user hasn't interacted yet
+    if (!userHasInteracted) return;
+    
     const lowercaseMsg = message.toLowerCase();
     
     // Check for any bark keywords
@@ -131,7 +140,7 @@ function playBarkSounds(message) {
         
         function playNextBark() {
             barkSound.currentTime = 0;
-            barkSound.play();
+            barkSound.play().catch(err => console.log("Audio play error:", err));
             playedCount++;
             
             if (playedCount < barkCount) {
@@ -152,14 +161,31 @@ function speakText(text) {
 }
 
 // Event listeners
-sendBtn.addEventListener('click', handleSendMessage);
+sendBtn.addEventListener('click', function() {
+    userHasInteracted = true;
+    handleSendMessage();
+});
+
 messageInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
+        userHasInteracted = true;
         handleSendMessage();
     }
 });
 
-connectBtn.addEventListener('click', toggleTwitchConnection);
+connectBtn.addEventListener('click', function() {
+    userHasInteracted = true;
+    toggleTwitchConnection();
+});
+
+// Add event listeners to ensure user has interacted with the page
+document.addEventListener('click', function() {
+    userHasInteracted = true;
+});
+
+document.addEventListener('keypress', function() {
+    userHasInteracted = true;
+});
 
 function handleSendMessage() {
     const message = messageInput.value.trim();
