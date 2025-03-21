@@ -100,25 +100,137 @@ function addMessageToChat(sender, message, isLuna = false) {
     if (isLuna) {
         bark();
         
-        // Play bark sounds for any bark-like words
-        countAndPlayBarks(message);
-        
-        // Check for actions in asterisks and use TTS
-        if (message.includes('*')) {
-            const matches = message.match(/\*(.*?)\*/g);
-            if (matches && matches.length > 0) {
-                const actions = matches.map(match => match.replace(/\*/g, '').trim());
-                const ttsText = `Luna, ${actions.join(', ')}`;
-                speakText(ttsText);
-            }
-        }
+        // Parse the message to play barks and TTS in sequence
+        processLunaResponse(message);
     }
 }
 
-function countAndPlayBarks(message) {
+function processLunaResponse(message) {
     // Don't try to play sounds if user hasn't interacted yet
     if (!userHasInteracted) return;
     
+    // Extract parts of the message: bark sounds and actions
+    const parts = [];
+    let remainingMessage = message;
+    
+    // Extract actions in asterisks
+    const asteriskRegex = /\*(.*?)\*/g;
+    let match;
+    let lastIndex = 0;
+    
+    while ((match = asteriskRegex.exec(message)) !== null) {
+        // If there's text before the asterisk, add it as a potential bark part
+        if (match.index > lastIndex) {
+            const textBefore = message.substring(lastIndex, match.index).trim();
+            if (textBefore) {
+                parts.push({ type: 'bark', text: textBefore });
+            }
+        }
+        
+        // Add the action in asterisks
+        parts.push({ type: 'action', text: match[1].trim() });
+        
+        lastIndex = match.index + match[0].length;
+    }
+    
+    // Add any remaining text after the last asterisk
+    if (lastIndex < message.length) {
+        const textAfter = message.substring(lastIndex).trim();
+        if (textAfter) {
+            parts.push({ type: 'bark', text: textAfter });
+        }
+    }
+    
+    // If we couldn't parse into parts properly, just try to count barks
+    if (parts.length === 0) {
+        countAndPlayBarks(message);
+        return;
+    }
+    
+    // Process the parts in sequence
+    processLunaParts(parts, 0);
+}
+
+function processLunaParts(parts, index) {
+    if (index >= parts.length) return;
+    
+    const part = parts[index];
+    
+    if (part.type === 'bark') {
+        // Count and play barks for this part
+        const barkCount = countBarksInText(part.text);
+        
+        if (barkCount > 0) {
+            playBarkSequence(barkCount, () => {
+                // When barks are done, move to next part
+                setTimeout(() => processLunaParts(parts, index + 1), 300);
+            });
+        } else {
+            // No barks found, move to next part
+            processLunaParts(parts, index + 1);
+        }
+    } else if (part.type === 'action') {
+        // Speak the action with TTS
+        const ttsText = `Luna, ${part.text}`;
+        speakTextWithCallback(ttsText, () => {
+            // When TTS is done, move to next part
+            setTimeout(() => processLunaParts(parts, index + 1), 300);
+        });
+    }
+}
+
+function countBarksInText(text) {
+    const lowercaseText = text.toLowerCase();
+    let count = 0;
+    
+    BARK_KEYWORDS.forEach(keyword => {
+        const regex = new RegExp(keyword, 'gi');
+        const matches = lowercaseText.match(regex) || [];
+        count += matches.length;
+    });
+    
+    return count;
+}
+
+function playBarkSequence(count, callback) {
+    let played = 0;
+    
+    function playNext() {
+        barkSound.currentTime = 0;
+        barkSound.play().catch(err => {
+            console.log("Audio play error:", err);
+            if (callback) callback();
+        });
+        
+        played++;
+        
+        if (played < count) {
+            barkSound.onended = playNext;
+        } else {
+            barkSound.onended = callback;
+        }
+    }
+    
+    playNext();
+}
+
+function speakTextWithCallback(text, callback) {
+    const utterance = new SpeechSynthesisUtterance(text);
+    
+    utterance.onend = function() {
+        if (callback) callback();
+    };
+    
+    utterance.onerror = function() {
+        console.error("TTS error");
+        if (callback) callback();
+    };
+    
+    speechSynthesis.speak(utterance);
+}
+
+function countAndPlayBarks(message) {
+    // This function can be kept as a fallback but is largely replaced by processLunaResponse
     const lowercaseMsg = message.toLowerCase();
     
     // Check for any bark keywords
@@ -130,34 +242,13 @@ function countAndPlayBarks(message) {
         barkCount += matches.length;
     });
     
-    if (barkCount > 0) {
-        let playedCount = 0;
-        
-        function playNextBark() {
-            barkSound.currentTime = 0;
-            barkSound.play().catch(err => console.log("Audio play error:", err));
-            playedCount++;
-            
-            if (playedCount < barkCount) {
-                setTimeout(() => {
-                    barkSound.onended = null;
-                    playNextBark();
-                }, 300); // Add a small delay between barks
-            } else {
-                barkSound.onended = null;
-            }
-        }
-        
-        if (userHasInteracted) {
-            playNextBark();
-        }
+    if (barkCount > 0 && userHasInteracted) {
+        playBarkSequence(barkCount);
     }
 }
 
-// Function to speak text using TTS
 function speakText(text) {
-    const utterance = new SpeechSynthesisUtterance(text);
-    speechSynthesis.speak(utterance);
+    speakTextWithCallback(text);
 }
 
 // Event listeners
