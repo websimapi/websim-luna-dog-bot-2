@@ -57,7 +57,7 @@ async function getLLMResponse(message) {
             messages: [
                 {
                     role: "system",
-                    content: "You are Luna, a friendly dog. Respond ONLY like a dog would with barks, whines, and physical actions in asterisks. Always follow this exact format: Start with a bark word (woof, bark, arf, ruff, awoo), then include actions in asterisks, then optionally end with more barks. For example: 'Woof! *wags tail excitedly*' or 'Arf! *tilts head curiously* Woof woof!' Keep responses under 2 sentences. Never use human language or explain things. Always include at least one bark sound and one action in asterisks. Make your response very easy to parse by clearly separating barks from actions in asterisks."
+                    content: "You are Luna, a friendly dog. Respond ONLY like a dog would with barks, whines, and physical actions in asterisks. Always format your response with bark sounds (woof, bark, arf, ruff, awoo) separated from actions. For example: 'Woof! Woof! *wags tail excitedly*' or '*tilts head curiously* Arf arf!' Keep responses under 2 sentences. Never use human language or explain things. Always include at least one bark sound (woof, bark, arf, ruff, awoo)."
                 },
                 ...conversationHistory
             ]
@@ -109,47 +109,47 @@ function processLunaResponse(message) {
     // Don't try to play sounds if user hasn't interacted yet
     if (!userHasInteracted) return;
     
-    console.log("Processing Luna response:", message);
-    
     // Extract parts of the message: bark sounds and actions
     const parts = [];
-    let remainingMessage = message;
     
-    // Extract actions in asterisks
-    const asteriskRegex = /\*(.*?)\*/g;
+    // Regular expression to match *actions* and any surrounding text
+    const regex = /([^*]*)\*([^*]*)\*([^*]*)/g;
     let match;
-    let lastIndex = 0;
+    let remainder = message;
     
-    while ((match = asteriskRegex.exec(message)) !== null) {
-        // If there's text before the asterisk, add it as a potential bark part
-        if (match.index > lastIndex) {
-            const textBefore = message.substring(lastIndex, match.index).trim();
-            if (textBefore) {
-                parts.push({ type: 'bark', text: textBefore });
-            }
+    // Process all matches of pattern: text *action* text
+    while ((match = regex.exec(message)) !== null) {
+        const [fullMatch, beforeAction, action, afterAction] = match;
+        
+        // Add text before action if it exists
+        if (beforeAction.trim()) {
+            parts.push({ type: 'bark', text: beforeAction.trim() });
         }
         
-        // Add the action in asterisks
-        parts.push({ type: 'action', text: match[1].trim() });
-        
-        lastIndex = match.index + match[0].length;
-    }
-    
-    // Add any remaining text after the last asterisk
-    if (lastIndex < message.length) {
-        const textAfter = message.substring(lastIndex).trim();
-        if (textAfter) {
-            parts.push({ type: 'bark', text: textAfter });
+        // Add the action
+        if (action.trim()) {
+            parts.push({ type: 'action', text: action.trim() });
         }
+        
+        // Add text after action if it exists
+        if (afterAction.trim()) {
+            parts.push({ type: 'bark', text: afterAction.trim() });
+        }
+        
+        // Remove the processed portion from remainder
+        remainder = remainder.replace(fullMatch, '');
     }
     
-    // If we couldn't parse into parts properly, just try to count barks
+    // Add any remaining text that wasn't matched
+    if (remainder.trim()) {
+        parts.push({ type: 'bark', text: remainder.trim() });
+    }
+    
+    // If we couldn't parse into parts properly, use the fallback
     if (parts.length === 0) {
         countAndPlayBarks(message);
         return;
     }
-    
-    console.log("Parsed Luna parts:", parts);
     
     // Process the parts in sequence
     processLunaParts(parts, 0);
@@ -170,7 +170,7 @@ function processLunaParts(parts, index) {
                 setTimeout(() => processLunaParts(parts, index + 1), 300);
             });
         } else {
-            // No barks found, move to next part
+            // No barks found, move to next part immediately
             processLunaParts(parts, index + 1);
         }
     } else if (part.type === 'action') {
@@ -198,33 +198,21 @@ function countBarksInText(text) {
 }
 
 function playBarkSequence(count, callback) {
-    console.log(`Playing bark sequence: ${count} barks`);
     let played = 0;
     
     function playNext() {
-        if (!userHasInteracted) {
-            console.warn("User hasn't interacted yet, can't play audio");
+        barkSound.currentTime = 0;
+        barkSound.play().catch(err => {
+            console.log("Audio play error:", err);
             if (callback) callback();
-            return;
-        }
+        });
         
-        try {
-            barkSound.currentTime = 0;
-            barkSound.play().catch(err => {
-                console.error("Audio play error:", err);
-                if (callback) callback();
-            });
-            
-            played++;
-            
-            if (played < count) {
-                barkSound.onended = playNext;
-            } else {
-                barkSound.onended = callback;
-            }
-        } catch (error) {
-            console.error("Error playing bark:", error);
-            if (callback) callback();
+        played++;
+        
+        if (played < count) {
+            barkSound.onended = playNext;
+        } else {
+            barkSound.onended = callback;
         }
     }
     
@@ -232,34 +220,36 @@ function playBarkSequence(count, callback) {
 }
 
 function speakTextWithCallback(text, callback) {
-    console.log("Speaking with TTS:", text);
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.1;
+    utterance.volume = 0.9;
     
-    if (!window.speechSynthesis) {
-        console.error("Speech synthesis not available");
-        if (callback) callback();
-        return;
-    }
+    // Make sure callback gets called even if speech fails
+    let callbackCalled = false;
+    
+    const safeCallback = () => {
+        if (!callbackCalled) {
+            callbackCalled = true;
+            if (callback) callback();
+        }
+    };
+    
+    utterance.onend = safeCallback;
+    
+    utterance.onerror = function(event) {
+        console.error("TTS error:", event);
+        safeCallback();
+    };
+    
+    // Set a backup timeout in case speech synthesis fails silently
+    setTimeout(safeCallback, 5000);
     
     try {
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = 1.0;
-        utterance.pitch = 1.1;
-        utterance.volume = 0.9;
-        
-        utterance.onend = function() {
-            console.log("TTS ended successfully");
-            if (callback) callback();
-        };
-        
-        utterance.onerror = function(event) {
-            console.error("TTS error:", event);
-            if (callback) callback();
-        };
-        
         window.speechSynthesis.speak(utterance);
-    } catch (error) {
-        console.error("Error initializing speech:", error);
-        if (callback) callback();
+    } catch (err) {
+        console.error("TTS speak error:", err);
+        safeCallback();
     }
 }
 
@@ -485,17 +475,19 @@ document.addEventListener('DOMContentLoaded', function() {
     if ('speechSynthesis' in window) {
         // Create and immediately cancel a blank utterance
         // This helps initialize the speech engine on some browsers
-        setTimeout(() => {
-            try {
-                const warmupUtterance = new SpeechSynthesisUtterance('');
-                window.speechSynthesis.speak(warmupUtterance);
-                window.speechSynthesis.cancel();
-                console.log("Speech synthesis initialized");
-            } catch (e) {
-                console.error("Error initializing speech synthesis:", e);
-            }
-        }, 1000);
+        const warmupUtterance = new SpeechSynthesisUtterance('');
+        window.speechSynthesis.speak(warmupUtterance);
+        window.speechSynthesis.cancel();
+        
+        console.log("Speech synthesis initialized");
     } else {
         console.error("Speech synthesis not supported in this browser");
+    }
+});
+
+// Ensure speech synthesis is available and properly reset
+window.addEventListener('beforeunload', function() {
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
     }
 });
