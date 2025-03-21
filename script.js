@@ -1,4 +1,4 @@
-import { LUNA_RESPONSES } from './config.js';
+import { LUNA_RESPONSES, BARK_KEYWORDS } from './config.js';
 
 // DOM Elements
 const dogMouth = document.getElementById('dog-mouth');
@@ -18,6 +18,7 @@ barkSound.volume = 0.7;
 let isConnected = false;
 let twitchConnection = null;
 let twitchSocket = null;
+let conversationHistory = [];
 
 // Luna's behaviors
 function bark() {
@@ -33,23 +34,40 @@ function bark() {
     }, 1000);
 }
 
-function generateLunaResponse(message) {
+async function generateLunaResponse(message) {
     // Convert message to lowercase for easier matching
     const lowercaseMsg = message.toLowerCase();
     
-    // Check for key words/phrases to determine response type
-    if (lowercaseMsg.includes('treat') || lowercaseMsg.includes('food') || lowercaseMsg.includes('snack')) {
-        return getRandomResponse('excited');
-    } else if (lowercaseMsg.includes('walk') || lowercaseMsg.includes('play') || lowercaseMsg.includes('outside')) {
-        return getRandomResponse('playful');
-    } else if (lowercaseMsg.includes('bad') || lowercaseMsg.includes('no') || lowercaseMsg.includes('stop')) {
-        return getRandomResponse('sad');
-    } else if (lowercaseMsg.includes('good') || lowercaseMsg.includes('pet') || lowercaseMsg.includes('love')) {
-        return getRandomResponse('happy');
-    } else if (lowercaseMsg.includes('?')) {
-        return getRandomResponse('confused');
-    } else {
-        // Default response
+    // Use LLM to generate a response based on message content
+    return getLLMResponse(message);
+}
+
+async function getLLMResponse(message) {
+    try {
+        const newMessage = {
+            role: "user", 
+            content: message
+        };
+        
+        conversationHistory.push(newMessage);
+        conversationHistory = conversationHistory.slice(-10);
+        
+        const completion = await websim.chat.completions.create({
+            messages: [
+                {
+                    role: "system",
+                    content: "You are Luna, a friendly dog. Respond ONLY like a dog would with barks, whines, and physical actions in asterisks. You should match your responses to the emotional tone of the message. Always include some variation of barking sounds (woof, bark, arf, ruff, awoo). Keep responses under 2 sentences. Never use human language or explain things."
+                },
+                ...conversationHistory
+            ]
+        });
+        
+        const response = completion.content;
+        conversationHistory.push(completion);
+        
+        return response;
+    } catch (error) {
+        console.error("Error getting LLM response:", error);
         return getRandomResponse('neutral');
     }
 }
@@ -81,10 +99,8 @@ function addMessageToChat(sender, message, isLuna = false) {
     if (isLuna) {
         bark();
         
-        // Play bark sounds if needed
-        if (message.toLowerCase().includes('bark')) {
-            playBarkSounds(message);
-        }
+        // Play bark sounds for any bark-like words
+        playBarkSounds(message);
         
         // Check for actions in asterisks and use TTS
         if (message.includes('*')) {
@@ -100,18 +116,25 @@ function addMessageToChat(sender, message, isLuna = false) {
 
 function playBarkSounds(message) {
     const lowercaseMsg = message.toLowerCase();
-    const barkMatches = lowercaseMsg.match(/bark/g) || [];
-    const numberOfBarks = barkMatches.length;
     
-    if (numberOfBarks > 0) {
-        let barkCount = 0;
+    // Check for any bark keywords
+    let barkCount = 0;
+    
+    BARK_KEYWORDS.forEach(keyword => {
+        const regex = new RegExp(keyword, 'gi');
+        const matches = lowercaseMsg.match(regex) || [];
+        barkCount += matches.length;
+    });
+    
+    if (barkCount > 0) {
+        let playedCount = 0;
         
         function playNextBark() {
             barkSound.currentTime = 0;
             barkSound.play();
-            barkCount++;
+            playedCount++;
             
-            if (barkCount < numberOfBarks) {
+            if (playedCount < barkCount) {
                 barkSound.onended = playNextBark;
             } else {
                 barkSound.onended = null;
@@ -143,11 +166,13 @@ function handleSendMessage() {
     if (message) {
         addMessageToChat('You', message);
         
-        // Generate Luna's response
-        setTimeout(() => {
-            const lunaResponse = generateLunaResponse(message);
-            addMessageToChat('Luna', lunaResponse, true);
-        }, 1000);
+        // Generate Luna's response only if her name is mentioned
+        if (message.toLowerCase().includes('luna')) {
+            setTimeout(async () => {
+                const lunaResponse = await generateLunaResponse(message);
+                addMessageToChat('Luna', lunaResponse, true);
+            }, 1000);
+        }
         
         messageInput.value = '';
     }
@@ -243,11 +268,13 @@ function connectToTwitch(channel) {
                 // Add message to chat
                 addMessageToChat(username, chatMessage);
                 
-                // Luna responds
-                setTimeout(() => {
-                    const lunaResponse = generateLunaResponse(chatMessage);
-                    addMessageToChat('Luna', lunaResponse, true);
-                }, 1500);
+                // Luna only responds if her name is mentioned
+                if (chatMessage.toLowerCase().includes('luna')) {
+                    setTimeout(async () => {
+                        const lunaResponse = await generateLunaResponse(chatMessage);
+                        addMessageToChat('Luna', lunaResponse, true);
+                    }, 1500);
+                }
             } catch (e) {
                 console.error('Error parsing Twitch message:', e);
             }

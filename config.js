@@ -67,3 +67,5 @@ export const LUNA_RESPONSES = {
     ]
 };
 
+// Luna's emotional barking keywords to trigger sounds
+export const BARK_KEYWORDS = ["bark", "woof", "arf", "ruff", "awoo"];
