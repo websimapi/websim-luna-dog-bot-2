@@ -149,9 +149,47 @@ function connectToTwitch(channel) {
         // Parse chat messages
         if (message.includes('PRIVMSG')) {
             try {
-                // Extract username and message content
-                const username = message.split('!')[0].slice(1);
-                const chatMessage = message.split('PRIVMSG #' + channel + ' :')[1];
+                // Extract message metadata and content
+                const messageParts = message.split(' ');
+                
+                // Extract tags (metadata) from the message
+                const tags = {};
+                if (message.startsWith('@')) {
+                    const tagsStr = messageParts[0].substring(1);
+                    const tagsList = tagsStr.split(';');
+                    tagsList.forEach(tag => {
+                        const [key, value] = tag.split('=');
+                        tags[key] = value;
+                    });
+                }
+                
+                // Get username from display-name tag or fallback to parsing
+                const username = tags['display-name'] || message.split('!')[0].slice(1);
+                
+                // Find the actual message content
+                const msgIndex = message.indexOf(` :${channel} :`);
+                let chatMessage;
+                
+                if (msgIndex !== -1) {
+                    chatMessage = message.substring(msgIndex + channel.length + 4);
+                } else {
+                    // Alternative parsing if the first method fails
+                    const msgParts = message.split(`PRIVMSG #${channel} :`);
+                    if (msgParts.length > 1) {
+                        chatMessage = msgParts[1];
+                    } else {
+                        // Final fallback
+                        const colonIndex = message.lastIndexOf(':');
+                        chatMessage = message.substring(colonIndex + 1);
+                    }
+                }
+                
+                // Store message with metadata
+                const messageData = {
+                    username,
+                    message: chatMessage,
+                    tags
+                };
                 
                 // Add message to chat
                 addMessageToChat(username, chatMessage);
