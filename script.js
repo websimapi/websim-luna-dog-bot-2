@@ -111,7 +111,6 @@ function processLunaResponse(message) {
     
     // Extract parts of the message: bark sounds and actions
     const parts = [];
-    let remainingMessage = message;
     
     // Extract actions in asterisks
     const asteriskRegex = /\*(.*?)\*/g;
