@@ -10,6 +10,10 @@ const connectBtn = document.getElementById('connect-btn');
 const channelInput = document.getElementById('channel');
 const statusIndicator = document.getElementById('status-indicator');
 
+// Create audio element for bark sound
+const barkSound = new Audio('dog-bark-179915.mp3');
+barkSound.volume = 0.7;
+
 // Luna's state
 let isConnected = false;
 let twitchConnection = null;
@@ -77,6 +81,11 @@ function addMessageToChat(sender, message, isLuna = false) {
     if (isLuna) {
         bark();
         
+        // Play bark sounds if needed
+        if (message.toLowerCase().includes('bark')) {
+            playBarkSounds(message);
+        }
+        
         // Check for actions in asterisks and use TTS
         if (message.includes('*')) {
             const matches = message.match(/\*(.*?)\*/g);
@@ -86,6 +95,30 @@ function addMessageToChat(sender, message, isLuna = false) {
                 speakText(ttsText);
             }
         }
+    }
+}
+
+function playBarkSounds(message) {
+    const lowercaseMsg = message.toLowerCase();
+    const barkMatches = lowercaseMsg.match(/bark/g) || [];
+    const numberOfBarks = barkMatches.length;
+    
+    if (numberOfBarks > 0) {
+        let barkCount = 0;
+        
+        function playNextBark() {
+            barkSound.currentTime = 0;
+            barkSound.play();
+            barkCount++;
+            
+            if (barkCount < numberOfBarks) {
+                barkSound.onended = playNextBark;
+            } else {
+                barkSound.onended = null;
+            }
+        }
+        
+        playNextBark();
     }
 }
 
