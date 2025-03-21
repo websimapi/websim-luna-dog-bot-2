@@ -33,11 +33,6 @@ function bark() {
     setTimeout(() => {
         dogTail.classList.remove('wag');
     }, 1000);
-    
-    // Only play sound if user has interacted with the page
-    if (userHasInteracted) {
-        playBarkSounds("woof");
-    }
 }
 
 async function generateLunaResponse(message) {
@@ -62,7 +57,7 @@ async function getLLMResponse(message) {
             messages: [
                 {
                     role: "system",
-                    content: "You are Luna, a friendly dog. Respond ONLY like a dog would with barks, whines, and physical actions in asterisks. You should match your responses to the emotional tone of the message. Always include some variation of barking sounds (woof, bark, arf, ruff, awoo). Keep responses under 2 sentences. Never use human language or explain things."
+                    content: "You are Luna, a friendly dog. Respond ONLY like a dog would with barks, whines, and physical actions in asterisks. Always format your response with bark sounds (woof, bark, arf, ruff, awoo) separated from actions. For example: 'Woof! Woof! *wags tail excitedly*' or '*tilts head curiously* Arf arf!' Keep responses under 2 sentences. Never use human language or explain things. Always include at least one bark sound (woof, bark, arf, ruff, awoo)."
                 },
                 ...conversationHistory
             ]
@@ -106,24 +101,21 @@ function addMessageToChat(sender, message, isLuna = false) {
         bark();
         
         // Play bark sounds for any bark-like words
-        playBarkSounds(message);
+        countAndPlayBarks(message);
         
         // Check for actions in asterisks and use TTS
         if (message.includes('*')) {
             const matches = message.match(/\*(.*?)\*/g);
             if (matches && matches.length > 0) {
-                // Extract the text between asterisks
-                const actionsText = matches.map(match => match.replace(/\*/g, '')).join(', ');
-                // Create the TTS text
-                const ttsText = `Luna ${actionsText}`;
-                console.log("Speaking:", ttsText); // Debug log
+                const actions = matches.map(match => match.replace(/\*/g, '').trim());
+                const ttsText = `Luna, ${actions.join(', ')}`;
                 speakText(ttsText);
             }
         }
     }
 }
 
-function playBarkSounds(message) {
+function countAndPlayBarks(message) {
     // Don't try to play sounds if user hasn't interacted yet
     if (!userHasInteracted) return;
     
@@ -147,33 +139,25 @@ function playBarkSounds(message) {
             playedCount++;
             
             if (playedCount < barkCount) {
-                barkSound.onended = playNextBark;
+                setTimeout(() => {
+                    barkSound.onended = null;
+                    playNextBark();
+                }, 300); // Add a small delay between barks
             } else {
                 barkSound.onended = null;
             }
         }
         
-        playNextBark();
+        if (userHasInteracted) {
+            playNextBark();
+        }
     }
 }
 
 // Function to speak text using TTS
 function speakText(text) {
-    if ('speechSynthesis' in window) {
-        // Cancel any ongoing speech
-        window.speechSynthesis.cancel();
-        
-        const utterance = new SpeechSynthesisUtterance(text);
-        // Set properties for better performance
-        utterance.volume = 1;
-        utterance.rate = 1;
-        utterance.pitch = 1;
-        
-        window.speechSynthesis.speak(utterance);
-        console.log("Speech synthesis started for:", text);
-    } else {
-        console.error("Text-to-speech not supported in this browser");
-    }
+    const utterance = new SpeechSynthesisUtterance(text);
+    speechSynthesis.speak(utterance);
 }
 
 // Event listeners
