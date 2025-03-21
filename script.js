@@ -111,41 +111,37 @@ function processLunaResponse(message) {
     
     // Extract parts of the message: bark sounds and actions
     const parts = [];
+    let remainingMessage = message;
     
-    // Regular expression to match *actions* and any surrounding text
-    const regex = /([^*]*)\*([^*]*)\*([^*]*)/g;
+    // Extract actions in asterisks
+    const asteriskRegex = /\*(.*?)\*/g;
     let match;
-    let remainder = message;
+    let lastIndex = 0;
     
-    // Process all matches of pattern: text *action* text
-    while ((match = regex.exec(message)) !== null) {
-        const [fullMatch, beforeAction, action, afterAction] = match;
-        
-        // Add text before action if it exists
-        if (beforeAction.trim()) {
-            parts.push({ type: 'bark', text: beforeAction.trim() });
+    while ((match = asteriskRegex.exec(message)) !== null) {
+        // If there's text before the asterisk, add it as a potential bark part
+        if (match.index > lastIndex) {
+            const textBefore = message.substring(lastIndex, match.index).trim();
+            if (textBefore) {
+                parts.push({ type: 'bark', text: textBefore });
+            }
         }
         
-        // Add the action
-        if (action.trim()) {
-            parts.push({ type: 'action', text: action.trim() });
-        }
+        // Add the action in asterisks
+        parts.push({ type: 'action', text: match[1].trim() });
         
-        // Add text after action if it exists
-        if (afterAction.trim()) {
-            parts.push({ type: 'bark', text: afterAction.trim() });
-        }
-        
-        // Remove the processed portion from remainder
-        remainder = remainder.replace(fullMatch, '');
+        lastIndex = match.index + match[0].length;
     }
     
-    // Add any remaining text that wasn't matched
-    if (remainder.trim()) {
-        parts.push({ type: 'bark', text: remainder.trim() });
+    // Add any remaining text after the last asterisk
+    if (lastIndex < message.length) {
+        const textAfter = message.substring(lastIndex).trim();
+        if (textAfter) {
+            parts.push({ type: 'bark', text: textAfter });
+        }
     }
     
-    // If we couldn't parse into parts properly, use the fallback
+    // If we couldn't parse into parts properly, just try to count barks
     if (parts.length === 0) {
         countAndPlayBarks(message);
         return;
@@ -170,7 +166,7 @@ function processLunaParts(parts, index) {
                 setTimeout(() => processLunaParts(parts, index + 1), 300);
             });
         } else {
-            // No barks found, move to next part immediately
+            // No barks found, move to next part
             processLunaParts(parts, index + 1);
         }
     } else if (part.type === 'action') {
@@ -225,32 +221,16 @@ function speakTextWithCallback(text, callback) {
     utterance.pitch = 1.1;
     utterance.volume = 0.9;
     
-    // Make sure callback gets called even if speech fails
-    let callbackCalled = false;
-    
-    const safeCallback = () => {
-        if (!callbackCalled) {
-            callbackCalled = true;
-            if (callback) callback();
-        }
+    utterance.onend = function() {
+        if (callback) callback();
     };
-    
-    utterance.onend = safeCallback;
     
     utterance.onerror = function(event) {
         console.error("TTS error:", event);
-        safeCallback();
+        if (callback) callback();
     };
     
-    // Set a backup timeout in case speech synthesis fails silently
-    setTimeout(safeCallback, 5000);
-    
-    try {
-        window.speechSynthesis.speak(utterance);
-    } catch (err) {
-        console.error("TTS speak error:", err);
-        safeCallback();
-    }
+    window.speechSynthesis.speak(utterance);
 }
 
 function countAndPlayBarks(message) {
@@ -482,12 +462,5 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log("Speech synthesis initialized");
     } else {
         console.error("Speech synthesis not supported in this browser");
-    }
-});
-
-// Ensure speech synthesis is available and properly reset
-window.addEventListener('beforeunload', function() {
-    if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
     }
 });
