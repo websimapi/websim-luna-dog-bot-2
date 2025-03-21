@@ -112,8 +112,11 @@ function addMessageToChat(sender, message, isLuna = false) {
         if (message.includes('*')) {
             const matches = message.match(/\*(.*?)\*/g);
             if (matches && matches.length > 0) {
-                const actions = matches.map(match => match.replace(/\*/g, '').trim());
-                const ttsText = `Luna, ${actions.join(', ')}`;
+                // Extract the text between asterisks
+                const actionsText = matches.map(match => match.replace(/\*/g, '')).join(', ');
+                // Create the TTS text
+                const ttsText = `Luna ${actionsText}`;
+                console.log("Speaking:", ttsText); // Debug log
                 speakText(ttsText);
             }
         }
@@ -156,8 +159,21 @@ function playBarkSounds(message) {
 
 // Function to speak text using TTS
 function speakText(text) {
-    const utterance = new SpeechSynthesisUtterance(text);
-    speechSynthesis.speak(utterance);
+    if ('speechSynthesis' in window) {
+        // Cancel any ongoing speech
+        window.speechSynthesis.cancel();
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        // Set properties for better performance
+        utterance.volume = 1;
+        utterance.rate = 1;
+        utterance.pitch = 1;
+        
+        window.speechSynthesis.speak(utterance);
+        console.log("Speech synthesis started for:", text);
+    } else {
+        console.error("Text-to-speech not supported in this browser");
+    }
 }
 
 // Event listeners
